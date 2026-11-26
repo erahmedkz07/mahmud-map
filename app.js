@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var ASTANA = [51.1283, 71.4304];
+  var HOME = [43.3017, 68.2700]; // Turkistan
   var MAX_POINTS = 15;
   var tg = window.Telegram && window.Telegram.WebApp;
   var inTelegram = !!(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
@@ -40,7 +40,7 @@
   }
 
   // ---------- map ----------
-  var map = L.map('map', { zoomControl: false }).setView(ASTANA, 12);
+  var map = L.map('map', { zoomControl: false }).setView(HOME, 13);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
