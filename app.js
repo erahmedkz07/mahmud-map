@@ -1,5 +1,5 @@
 /* Route map for the Mahmud assistant: Leaflet + OpenStreetMap, Photon search, OSRM routing,
-   optional TomTom traffic. No server of its own. The bot passes data in the URL fragment, which
+   live traffic from the Yandex map widget (no key needed). No server of its own. The bot passes data in the URL fragment, which
    browsers never send to the web host. Every external string is inserted with textContent. */
 (function () {
   'use strict';
@@ -10,7 +10,7 @@
   var inTelegram = !!(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
   var $ = function (id) { return document.getElementById(id); };
 
-  var state = { points: [], mode: 'car', routes: [], active: 0, traffic: false, key: '', canSend: false, request: 0, me: null };
+  var state = { points: [], mode: 'car', routes: [], active: 0, canSend: false, request: 0, me: null };
   var saved = [];
 
   // ---------- data from the bot ----------
@@ -48,7 +48,6 @@
   var markers = L.layerGroup().addTo(map);
   var lines = L.layerGroup().addTo(map);
   var meLayer = L.layerGroup().addTo(map);
-  var trafficLayer = null;
 
   function pinIcon(number) {
     var pin = document.createElement('div');
@@ -161,25 +160,10 @@
     return fetchJson(osrmBase('route') + coordinates() + '?overview=full&geometries=geojson&alternatives=3&steps=false')
       .then(function (data) {
         return data.routes.map(function (r) {
-          return { seconds: r.duration, meters: r.distance, delay: null,
+          return { seconds: r.duration, meters: r.distance,
             line: r.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }) };
         });
       });
-  }
-
-  function tomtomRoutes() {
-    var places = state.points.map(function (p) { return p.lat.toFixed(6) + ',' + p.lon.toFixed(6); }).join(':');
-    var url = 'https://api.tomtom.com/routing/1/calculateRoute/' + places + '/json?key=' + encodeURIComponent(state.key) +
-      '&traffic=true&travelMode=' + (state.mode === 'foot' ? 'pedestrian' : 'car') + '&routeType=fastest' +
-      (state.points.length === 2 ? '&maxAlternatives=2' : '');
-    return fetchJson(url).then(function (data) {
-      return data.routes.map(function (r) {
-        var line = [];
-        r.legs.forEach(function (leg) { leg.points.forEach(function (pt) { line.push([pt.latitude, pt.longitude]); }); });
-        return { seconds: r.summary.travelTimeInSeconds, meters: r.summary.lengthInMeters,
-          delay: r.summary.trafficDelayInSeconds, line: line };
-      });
-    });
   }
 
   function buildRoute() {
@@ -193,8 +177,7 @@
       return;
     }
     say('Строю маршрут…');
-    var primary = state.key ? tomtomRoutes().catch(function () { return osrmRoutes(); }) : osrmRoutes();
-    primary.then(function (routes) {
+    osrmRoutes().then(function (routes) {
       if (ticket !== state.request) return; // the points changed while we were waiting
       routes.sort(function (a, b) { return a.seconds - b.seconds; });
       state.routes = routes; state.active = 0;
@@ -224,14 +207,14 @@
       var b = document.createElement('button');
       b.type = 'button'; if (i === state.active) b.className = 'on';
       var left = document.createElement('span');
-      left.textContent = (i === 0 ? '⚡ Самый быстрый' : 'Вариант ' + (i + 1)) + (r.delay > 60 ? ' · пробки +' + duration(r.delay) : '');
+      left.textContent = i === 0 ? '⚡ Самый быстрый' : 'Вариант ' + (i + 1);
       var right = document.createElement('strong');
       right.textContent = duration(r.seconds) + ' · ' + (r.meters / 1000).toFixed(1) + ' км';
       b.append(left, right);
       b.addEventListener('click', function () { state.active = i; drawRoutes(); });
       box.appendChild(b);
     });
-    say(state.routes[0].delay === null ? 'Время без учёта пробок.' : 'Время с учётом пробок (TomTom).');
+    say('Время без учёта пробок. С пробками — кнопка «🚦 Пробки».');
   }
 
   function optimizeOrder() {
@@ -357,19 +340,27 @@
     });
   }
 
-  // ---------- traffic ----------
-  function setTraffic(on) {
-    if (on && !state.key) {
-      say('Пробки на этой карте включаются бесплатным ключом TomTom (ещё не подключён). Сейчас смотрите пробки по кнопке «Яндекс (пробки)».');
-      return;
+  // ---------- traffic: the Yandex map widget shows live traffic and the time with it; no key needed ----------
+  function trafficUrl() {
+    var base = 'https://yandex.kz/map-widget/v1/?l=trf';
+    var p = state.points;
+    if (!p.length) {
+      var c = map.getCenter();
+      return base + '&ll=' + c.lng.toFixed(5) + '%2C' + c.lat.toFixed(5) + '&z=' + map.getZoom();
     }
-    state.traffic = on;
-    $('traffic').classList.toggle('on', on);
-    if (trafficLayer) { map.removeLayer(trafficLayer); trafficLayer = null; }
-    if (on) {
-      trafficLayer = L.tileLayer('https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=' +
-        encodeURIComponent(state.key), { maxZoom: 19, opacity: .85, attribution: 'Пробки © TomTom' }).addTo(map);
+    if (p.length === 1) { // one place: its district with traffic (a route needs a start the widget cannot know)
+      var at = p[0].lon.toFixed(6) + '%2C' + p[0].lat.toFixed(6);
+      return base + '&ll=' + at + '&z=14&pt=' + at;
     }
+    var latLon = p.map(function (x) { return x.lat.toFixed(6) + '%2C' + x.lon.toFixed(6); });
+    return base + '&rtext=' + latLon.join('~') + '&rtt=' + (state.mode === 'foot' ? 'pd' : 'auto');
+  }
+
+  // Opened in its own window (inside Telegram: the in-app browser), so the route here stays as it was
+  function showTraffic() {
+    var url = trafficUrl();
+    if (inTelegram && tg.openLink) tg.openLink(url);
+    else window.open(url, '_blank', 'noopener');
   }
 
   // ---------- events ----------
@@ -391,7 +382,7 @@
       changed(false);
     });
   });
-  $('traffic').addEventListener('click', function () { setTraffic(!state.traffic); });
+  $('traffic').addEventListener('click', showTraffic);
   $('optimize').addEventListener('click', optimizeOrder);
   $('save-route').addEventListener('click', saveRoute);
   $('clear').addEventListener('click', function () { state.points = []; changed(false); });
@@ -402,7 +393,6 @@
     if (inTelegram) { tg.ready(); tg.expand(); if (tg.disableVerticalSwipes && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); }
     state.mode = data.m === 'foot' ? 'foot' : 'car';
     document.querySelectorAll('.modes button[data-mode]').forEach(function (x) { x.classList.toggle('on', x.dataset.mode === state.mode); });
-    state.key = typeof data.k === 'string' ? data.k.slice(0, 100) : '';
     state.canSend = !!(data.send && inTelegram && tg.sendData);
     state.points = toPoints(data.p);
     readSaved(function (items) {
@@ -413,7 +403,6 @@
       drawSaved();
     });
     changed(true);
-    if (state.key) setTraffic(true);
     if (data.me) locate(true);
     setTimeout(function () { map.invalidateSize(); fit(); }, 250);
   }
