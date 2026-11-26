@@ -10,6 +10,69 @@
   var inTelegram = !!(tg && tg.initData !== undefined && tg.platform && tg.platform !== 'unknown');
   var $ = function (id) { return document.getElementById(id); };
 
+  var TR = {
+    "Не больше ": "En fazla ",
+    " точек в маршруте.": " nokta eklenebilir.",
+    "Точка на карте": "Haritadaki nokta",
+    "Сохранить место": "Yeri kaydet",
+    "Выше": "Yukarı",
+    "Убрать точку": "Noktayı kaldır",
+    "Добавьте вторую точку или нажмите 📍, чтобы ехать от себя.": "İkinci noktayı ekleyin veya bulunduğunuz yerden gitmek için 📍 düğmesine basın.",
+    "Найдите место или нажмите на карту, чтобы добавить точку.": "Yer arayın veya nokta eklemek için haritaya dokunun.",
+    "Строю маршрут…": "Rota oluşturuluyor…",
+    "Не удалось построить маршрут. Проверьте точки или попробуйте через минуту.": "Rota oluşturulamadı. Noktaları kontrol edin veya bir dakika sonra deneyin.",
+    " мин": " dk",
+    " ч ": " sa ",
+    "⚡ Самый быстрый": "⚡ En hızlı",
+    "Вариант ": "Seçenek ",
+    " км": " km",
+    "Время без учёта пробок. С пробками — кнопка «🚦 Пробки».": "Süre trafik hariç. Trafik için «🚦 Trafik» düğmesi.",
+    "Подбираю лучший порядок точек…": "En iyi sıra hesaplanıyor…",
+    "Не удалось подобрать порядок. Попробуйте через минуту.": "Sıra hesaplanamadı. Bir dakika sonra deneyin.",
+    "Место": "Yer",
+    "Ищу…": "Aranıyor…",
+    "Ничего не найдено. Уточните адрес или добавьте город.": "Bir şey bulunamadı. Adresi netleştirin veya şehir ekleyin.",
+    "Поиск сейчас недоступен. Попробуйте через минуту.": "Arama şu anda kullanılamıyor. Bir dakika sonra deneyin.",
+    "Телефон не отдаёт местоположение. Отправьте геопозицию боту в чате.": "Telefon konum vermiyor. Konumunuzu sohbette bota gönderin.",
+    "Определяю, где вы…": "Konumunuz belirleniyor…",
+    "Моё место": "Konumum",
+    "Нет доступа к местоположению. Разрешите его для Telegram или отправьте геопозицию боту в чате.": "Konuma erişim yok. Telegram için izin verin veya konumunuzu bota gönderin.",
+    "Название:": "Ad:",
+    "Сохранено: ": "Kaydedildi: ",
+    "Сохранить и в боте, чтобы строить маршрут голосом? Карта закроется.": "Sesle rota oluşturabilmek için bota da kaydedilsin mi? Harita kapanacak.",
+    "Маршрут ": "Rota ",
+    "Пока пусто. Нажмите ⭐ у точки.": "Henüz boş. Bir noktanın yanındaki ⭐ düğmesine basın.",
+    "Добавить на карту": "Haritaya ekle",
+    "Удалить": "Sil",
+    "Куда едем? Адрес или место": "Nereye? Adres veya yer",
+    "Найти": "Ara",
+    "🚗 Авто": "🚗 Araba",
+    "🚶 Пешком": "🚶 Yürüyerek",
+    "🚦 Пробки": "🚦 Trafik",
+    "⚡ Лучший порядок": "⚡ En iyi sıra",
+    "💾 Сохранить маршрут": "💾 Rotayı kaydet",
+    "🧹 Очистить": "🧹 Temizle",
+    "Яндекс (пробки)": "Yandex (trafik)",
+    "⭐ Сохранённые места и маршруты": "⭐ Kayıtlı yerler ve rotalar",
+    "Свернуть или развернуть панель": "Paneli aç veya kapat",
+    "Карта": "Harita",
+    "Mahmud · Карта": "Mahmud · Harita"
+  };
+  var language = 'ru';
+  function t(text) { return language === 'tr' && TR.hasOwnProperty(text) ? TR[text] : text; }
+
+  function translatePage() {
+    if (language !== 'tr') return;
+    document.documentElement.lang = 'tr';
+    document.title = t(document.title);
+    document.querySelectorAll('button, a, summary, #status').forEach(function (el) {
+      if (!el.children.length) el.textContent = t(el.textContent.trim()) || el.textContent;
+    });
+    ['placeholder', 'title', 'aria-label'].forEach(function (name) {
+      document.querySelectorAll('[' + name + ']').forEach(function (el) { el.setAttribute(name, t(el.getAttribute(name))); });
+    });
+  }
+
   var state = { points: [], mode: 'car', routes: [], active: 0, canSend: false, request: 0, me: null };
   var saved = [];
 
@@ -68,7 +131,7 @@
 
   function addPoint(point, andFit) {
     if (!point) return;
-    if (state.points.length >= MAX_POINTS) { say('Не больше ' + MAX_POINTS + ' точек в маршруте.'); return; }
+    if (state.points.length >= MAX_POINTS) { say(t('Не больше ') + MAX_POINTS + t(' точек в маршруте.')); return; }
     state.points.push(point);
     changed(andFit);
   }
@@ -86,7 +149,7 @@
       var marker = L.marker([p.lat, p.lon], { icon: pinIcon(i + 1), draggable: true }).addTo(markers);
       marker.on('dragend', function () {
         var at = marker.getLatLng();
-        state.points[i] = { lat: at.lat, lon: at.lng, name: 'Точка на карте' };
+        state.points[i] = { lat: at.lat, lon: at.lng, name: t('Точка на карте') };
         changed(false);
       });
     });
@@ -107,11 +170,11 @@
       var name = document.createElement('span'); name.className = 'name'; name.textContent = p.name;
       name.addEventListener('click', function () { map.setView([p.lat, p.lon], 16); });
       li.append(num, name);
-      li.appendChild(smallButton('⭐', 'Сохранить место', function () { savePlace(p); }));
-      if (i > 0) li.appendChild(smallButton('↑', 'Выше', function () {
+      li.appendChild(smallButton('⭐', t('Сохранить место'), function () { savePlace(p); }));
+      if (i > 0) li.appendChild(smallButton('↑', t('Выше'), function () {
         state.points.splice(i - 1, 2, state.points[i], state.points[i - 1]); changed(false);
       }));
-      li.appendChild(smallButton('✕', 'Убрать точку', function () { state.points.splice(i, 1); changed(false); }));
+      li.appendChild(smallButton('✕', t('Убрать точку'), function () { state.points.splice(i, 1); changed(false); }));
       list.appendChild(li);
     });
     $('clear').hidden = !state.points.length;
@@ -172,24 +235,24 @@
     $('routes').textContent = '';
     state.routes = [];
     if (state.points.length < 2) {
-      say(state.points.length ? 'Добавьте вторую точку или нажмите 📍, чтобы ехать от себя.'
-        : 'Найдите место или нажмите на карту, чтобы добавить точку.');
+      say(state.points.length ? t('Добавьте вторую точку или нажмите 📍, чтобы ехать от себя.')
+        : t('Найдите место или нажмите на карту, чтобы добавить точку.'));
       return;
     }
-    say('Строю маршрут…');
+    say(t('Строю маршрут…'));
     osrmRoutes().then(function (routes) {
       if (ticket !== state.request) return; // the points changed while we were waiting
       routes.sort(function (a, b) { return a.seconds - b.seconds; });
       state.routes = routes; state.active = 0;
       drawRoutes();
     }).catch(function () {
-      if (ticket === state.request) say('Не удалось построить маршрут. Проверьте точки или попробуйте через минуту.');
+      if (ticket === state.request) say(t('Не удалось построить маршрут. Проверьте точки или попробуйте через минуту.'));
     });
   }
 
   function duration(seconds) {
     var minutes = Math.max(1, Math.round(seconds / 60));
-    return minutes < 60 ? minutes + ' мин' : Math.floor(minutes / 60) + ' ч ' + (minutes % 60) + ' мин';
+    return minutes < 60 ? minutes + t(' мин') : Math.floor(minutes / 60) + t(' ч ') + (minutes % 60) + t(' мин');
   }
 
   function drawRoutes() {
@@ -207,32 +270,32 @@
       var b = document.createElement('button');
       b.type = 'button'; if (i === state.active) b.className = 'on';
       var left = document.createElement('span');
-      left.textContent = i === 0 ? '⚡ Самый быстрый' : 'Вариант ' + (i + 1);
+      left.textContent = i === 0 ? t('⚡ Самый быстрый') : t('Вариант ') + (i + 1);
       var right = document.createElement('strong');
-      right.textContent = duration(r.seconds) + ' · ' + (r.meters / 1000).toFixed(1) + ' км';
+      right.textContent = duration(r.seconds) + ' · ' + (r.meters / 1000).toFixed(1) + t(' км');
       b.append(left, right);
       b.addEventListener('click', function () { state.active = i; drawRoutes(); });
       box.appendChild(b);
     });
-    say('Время без учёта пробок. С пробками — кнопка «🚦 Пробки».');
+    say(t('Время без учёта пробок. С пробками — кнопка «🚦 Пробки».'));
   }
 
   function optimizeOrder() {
-    say('Подбираю лучший порядок точек…');
+    say(t('Подбираю лучший порядок точек…'));
     fetchJson(osrmBase('trip') + coordinates() + '?source=first&destination=last&roundtrip=false&overview=false')
       .then(function (data) {
         var ordered = [];
         data.waypoints.forEach(function (w, i) { ordered[w.waypoint_index] = state.points[i]; });
         state.points = ordered;
         changed(true);
-      }).catch(function () { say('Не удалось подобрать порядок. Попробуйте через минуту.'); });
+      }).catch(function () { say(t('Не удалось подобрать порядок. Попробуйте через минуту.')); });
   }
 
   // ---------- search ----------
   function describe(feature) {
     var p = feature.properties;
     var street = [p.street, p.housenumber].filter(Boolean).join(' ');
-    var title = p.name || street || p.city || 'Место';
+    var title = p.name || street || p.city || t('Место');
     var rest = [p.name ? street : '', p.district, p.city, p.country].filter(Boolean).join(', ');
     return { title: title, rest: rest };
   }
@@ -240,11 +303,11 @@
   function search(text) {
     var box = $('results');
     var center = map.getCenter();
-    box.hidden = false; box.textContent = 'Ищу…';
+    box.hidden = false; box.textContent = t('Ищу…');
     fetchJson('https://photon.komoot.io/api/?limit=7&lat=' + center.lat.toFixed(3) + '&lon=' + center.lng.toFixed(3) +
       '&q=' + encodeURIComponent(text)).then(function (data) {
       box.textContent = '';
-      if (!data.features.length) { box.textContent = 'Ничего не найдено. Уточните адрес или добавьте город.'; return; }
+      if (!data.features.length) { box.textContent = t('Ничего не найдено. Уточните адрес или добавьте город.'); return; }
       data.features.forEach(function (f) {
         var d = describe(f);
         var li = document.createElement('li');
@@ -259,23 +322,23 @@
         });
         li.appendChild(b); box.appendChild(li);
       });
-    }).catch(function () { box.textContent = 'Поиск сейчас недоступен. Попробуйте через минуту.'; });
+    }).catch(function () { box.textContent = t('Поиск сейчас недоступен. Попробуйте через минуту.'); });
   }
 
   // ---------- my location ----------
   function locate(thenStartHere) {
-    if (!navigator.geolocation) { say('Телефон не отдаёт местоположение. Отправьте геопозицию боту в чате.'); return; }
-    say('Определяю, где вы…');
+    if (!navigator.geolocation) { say(t('Телефон не отдаёт местоположение. Отправьте геопозицию боту в чате.')); return; }
+    say(t('Определяю, где вы…'));
     navigator.geolocation.getCurrentPosition(function (pos) {
-      state.me = validPoint(pos.coords.latitude, pos.coords.longitude, 'Моё место');
+      state.me = validPoint(pos.coords.latitude, pos.coords.longitude, t('Моё место'));
       meLayer.clearLayers();
       var dot = document.createElement('div'); dot.className = 'me';
       L.marker([state.me.lat, state.me.lon], { icon: L.divIcon({ html: dot, className: '', iconSize: [18, 18] }) }).addTo(meLayer);
-      var hasStart = state.points.length && state.points[0].name === 'Моё место';
+      var hasStart = state.points.length && state.points[0].name === t('Моё место');
       if (thenStartHere && state.points.length && !hasStart) { state.points.unshift(state.me); changed(true); }
       else { map.setView([state.me.lat, state.me.lon], 15); buildRoute(); }
     }, function () {
-      say('Нет доступа к местоположению. Разрешите его для Telegram или отправьте геопозицию боту в чате.');
+      say(t('Нет доступа к местоположению. Разрешите его для Telegram или отправьте геопозицию боту в чате.'));
     }, { enableHighAccuracy: true, timeout: 12000 });
   }
 
@@ -295,7 +358,7 @@
   }
 
   function askName(suggestion) {
-    var name = window.prompt('Название:', suggestion.slice(0, 40));
+    var name = window.prompt(t('Название:'), suggestion.slice(0, 40));
     return name ? name.trim().slice(0, 60) : '';
   }
 
@@ -304,9 +367,9 @@
     saved.unshift(item);
     saved = saved.slice(0, 30);
     writeSaved(); drawSaved();
-    say('Сохранено: ' + item.name);
+    say(t('Сохранено: ') + item.name);
     // opened from the bot's «🗺 Карта» button: the bot can receive it too, so voice commands know the name
-    if (state.canSend && window.confirm('Сохранить и в боте, чтобы строить маршрут голосом? Карта закроется.')) {
+    if (state.canSend && window.confirm(t('Сохранить и в боте, чтобы строить маршрут голосом? Карта закроется.'))) {
       tg.sendData(JSON.stringify({ type: 'save', name: item.name, points: item.points }));
     }
   }
@@ -317,23 +380,23 @@
   }
 
   function saveRoute() {
-    var name = askName('Маршрут ' + (saved.length + 1));
+    var name = askName(t('Маршрут ') + (saved.length + 1));
     if (name) store({ name: name, points: state.points.map(function (p) { return [+p.lat.toFixed(6), +p.lon.toFixed(6), p.name.slice(0, 60)]; }) });
   }
 
   function drawSaved() {
     var list = $('saved-list');
     list.textContent = '';
-    if (!saved.length) { var li = document.createElement('li'); li.textContent = 'Пока пусто. Нажмите ⭐ у точки.'; list.appendChild(li); return; }
+    if (!saved.length) { var li = document.createElement('li'); li.textContent = t('Пока пусто. Нажмите ⭐ у точки.'); list.appendChild(li); return; }
     saved.forEach(function (item) {
       var points = toPoints(item.points);
       if (!points.length) return;
       var li = document.createElement('li');
-      li.appendChild(smallButton((points.length > 1 ? '🛣 ' : '📌 ') + String(item.name).slice(0, 60), 'Добавить на карту', function () {
+      li.appendChild(smallButton((points.length > 1 ? '🛣 ' : '📌 ') + String(item.name).slice(0, 60), t('Добавить на карту'), function () {
         if (points.length > 1) { state.points = points.slice(); changed(true); }
         else addPoint(points[0], true);
       }));
-      li.appendChild(smallButton('✕', 'Удалить', function () {
+      li.appendChild(smallButton('✕', t('Удалить'), function () {
         saved = saved.filter(function (s) { return s !== item; }); writeSaved(); drawSaved();
       }));
       list.appendChild(li);
@@ -342,7 +405,7 @@
 
   // ---------- traffic: the Yandex map widget shows live traffic and the time with it; no key needed ----------
   function trafficUrl() {
-    var base = 'https://yandex.kz/map-widget/v1/?l=trf';
+    var base = 'https://yandex.kz/map-widget/v1/?l=trf' + (language === 'tr' ? '&lang=tr_TR' : '');
     var p = state.points;
     if (!p.length) {
       var c = map.getCenter();
@@ -371,7 +434,7 @@
   });
   map.on('click', function (e) {
     if (!$('results').hidden) { $('results').hidden = true; return; }
-    addPoint(validPoint(e.latlng.lat, e.latlng.lng, 'Точка на карте'), false);
+    addPoint(validPoint(e.latlng.lat, e.latlng.lng, t('Точка на карте')), false);
   });
   $('locate').addEventListener('click', function () { locate(true); });
   $('grip').addEventListener('click', function () { $('panel').classList.toggle('folded'); setTimeout(function () { map.invalidateSize(); }, 50); });
@@ -390,6 +453,8 @@
   // ---------- start ----------
   function start() {
     var data = readLaunchData();
+    language = data.l === 'tr' ? 'tr' : 'ru';
+    translatePage();
     if (inTelegram) { tg.ready(); tg.expand(); if (tg.disableVerticalSwipes && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); }
     state.mode = data.m === 'foot' ? 'foot' : 'car';
     document.querySelectorAll('.modes button[data-mode]').forEach(function (x) { x.classList.toggle('on', x.dataset.mode === state.mode); });
