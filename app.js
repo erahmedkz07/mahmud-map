@@ -4,6 +4,7 @@
 (function () {
   'use strict';
 
+  var MAP_VERSION = 'v7'; // shown on the map: tells a fresh page from one the phone kept in its cache
   var HOME = [43.3017, 68.2700]; // Turkistan
   var MAX_POINTS = 15;
   var tg = window.Telegram && window.Telegram.WebApp;
@@ -100,8 +101,9 @@
 
   function readLaunchData() {
     try {
-      var raw = new URLSearchParams(location.hash.slice(1)).get('d');
-      return raw ? decodeBase64Url(raw) : {};
+      // Telegram adds its own parameters to the address and may join them with &, # or ?: take only our value
+      var found = /(?:^|[#&?]|%23)d=([A-Za-z0-9_-]+)/.exec(location.hash);
+      return found ? decodeBase64Url(found[1]) : {};
     } catch (e) { return {}; }
   }
 
@@ -492,6 +494,9 @@
     var data = readLaunchData();
     language = data.l === 'tr' ? 'tr' : 'ru';
     traffic.key = validKey(data.tk);
+    // a quick diagnosis from a screenshot: did the bot's data and the traffic key reach the page (never the key itself)
+    map.attributionControl.setPrefix(MAP_VERSION + ' · data ' + (Object.keys(data).length ? '✓' : '—') +
+      ' · TomTom ' + (traffic.key ? '✓' : '—'));
     translatePage();
     if (inTelegram) { tg.ready(); tg.expand(); if (tg.disableVerticalSwipes && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); }
     state.mode = data.m === 'foot' ? 'foot' : 'car';
