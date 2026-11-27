@@ -53,6 +53,9 @@
     "💾 Сохранить маршрут": "💾 Rotayı kaydet",
     "🧹 Очистить": "🧹 Temizle",
     "Яндекс (пробки)": "Yandex (trafik)",
+    "Пробки (проба)": "Trafik (deneme)",
+    "Пробки TomTom не загрузились. Нажмите «🚦 Пробки» ещё раз — откроется Яндекс.": "TomTom trafiği yüklenemedi. «🚦 Trafik» düğmesine tekrar basın: Yandex açılır.",
+    "Пробки TomTom (проба): зелёный — свободно, жёлтый и красный — медленнее. Время маршрута без учёта пробок.": "TomTom trafiği (deneme): yeşil açık, sarı ve kırmızı daha yavaş. Rota süresi trafik hariç.",
     "⭐ Сохранённые места и маршруты": "⭐ Kayıtlı yerler ve rotalar",
     "Свернуть или развернуть панель": "Paneli aç veya kapat",
     "Карта": "Harita",
@@ -255,7 +258,7 @@
     return minutes < 60 ? minutes + t(' мин') : Math.floor(minutes / 60) + t(' ч ') + (minutes % 60) + t(' мин');
   }
 
-  function drawRoutes() {
+  function drawRoutes(keepStatus) {
     lines.clearLayers();
     var box = $('routes');
     box.textContent = '';
@@ -263,7 +266,10 @@
       .sort(function (a, b) { return (a === state.active) - (b === state.active); }); // the chosen one on top
     order.forEach(function (i) {
       var on = i === state.active;
-      L.polyline(state.routes[i].line, { color: on ? '#0e7c74' : '#8a94a6', weight: on ? 7 : 5, opacity: on ? .9 : .65 })
+      var style = traffic.on // blue and wide but see-through: green, yellow and red must stay readable
+        ? { color: on ? '#2457d6' : '#8a94a6', weight: on ? 11 : 5, opacity: on ? .38 : .35 }
+        : { color: on ? '#0e7c74' : '#8a94a6', weight: on ? 7 : 5, opacity: on ? .9 : .65 };
+      L.polyline(state.routes[i].line, style)
         .on('click', function () { state.active = i; drawRoutes(); }).addTo(lines);
     });
     state.routes.forEach(function (r, i) {
@@ -277,7 +283,7 @@
       b.addEventListener('click', function () { state.active = i; drawRoutes(); });
       box.appendChild(b);
     });
-    say(t('Время без учёта пробок. С пробками — кнопка «🚦 Пробки».'));
+    if (keepStatus !== true) say(t('Время без учёта пробок. С пробками — кнопка «🚦 Пробки».'));
   }
 
   function optimizeOrder() {
@@ -403,6 +409,36 @@
     });
   }
 
+  // ---------- trial: TomTom traffic as a coloured layer on our own map (only when the bot sent a key) ----------
+  var traffic = { key: '', layer: null, on: false, loaded: 0, failed: 0, broken: false };
+  var FAILS_BEFORE_GIVING_UP = 4;
+
+  function validKey(value) { return typeof value === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(value) ? value : ''; }
+
+  function setTrafficLayer(on) {
+    traffic.on = on;
+    $('traffic').classList.toggle('on', on);
+    $('traffic').setAttribute('aria-pressed', String(on));
+    if (traffic.layer) { map.removeLayer(traffic.layer); traffic.layer = null; }
+    if (on) {
+      traffic.loaded = 0; traffic.failed = 0;
+      traffic.layer = L.tileLayer('https://api.tomtom.com/maps/orbis/traffic/flow/raster/tile/{z}/{x}/{y}?apiVersion=2&style=light&key={k}',
+        { k: traffic.key, maxZoom: 19, opacity: 0.95, zIndex: 5, attribution: t('Пробки (проба)') + ' © TomTom' });
+      traffic.layer.on('tileload', function () { traffic.loaded += 1; });
+      traffic.layer.on('tileerror', function () {
+        traffic.failed += 1;
+        if (traffic.on && !traffic.loaded && traffic.failed >= FAILS_BEFORE_GIVING_UP) {
+          traffic.broken = true; // wrong key or the free limit is used up: the Yandex window still works
+          setTrafficLayer(false);
+          say(t('Пробки TomTom не загрузились. Нажмите «🚦 Пробки» ещё раз — откроется Яндекс.'));
+        }
+      });
+      traffic.layer.addTo(map);
+      say(t('Пробки TomTom (проба): зелёный — свободно, жёлтый и красный — медленнее. Время маршрута без учёта пробок.'));
+    }
+    if (state.routes.length) drawRoutes(true); // a thinner route line lets the road colours show through
+  }
+
   // ---------- traffic: the Yandex map widget shows live traffic and the time with it; no key needed ----------
   function trafficUrl() {
     var base = 'https://yandex.kz/map-widget/v1/?l=trf' + (language === 'tr' ? '&lang=tr_TR' : '');
@@ -421,6 +457,7 @@
 
   // Opened in its own window (inside Telegram: the in-app browser), so the route here stays as it was
   function showTraffic() {
+    if (traffic.key && !traffic.broken) { setTrafficLayer(!traffic.on); return; }
     var url = trafficUrl();
     if (inTelegram && tg.openLink) tg.openLink(url);
     else window.open(url, '_blank', 'noopener');
@@ -454,6 +491,7 @@
   function start() {
     var data = readLaunchData();
     language = data.l === 'tr' ? 'tr' : 'ru';
+    traffic.key = validKey(data.tk);
     translatePage();
     if (inTelegram) { tg.ready(); tg.expand(); if (tg.disableVerticalSwipes && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); }
     state.mode = data.m === 'foot' ? 'foot' : 'car';
